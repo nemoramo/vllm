@@ -610,8 +610,18 @@ class Gemma3nForConditionalGeneration(
     ) -> list[torch.Tensor]:
         assert self.audio_tower is not None
         # Run on padded features to enable batching
-        input_features = audio_input["input_features_padded"].squeeze(1)
-        input_features_mask = audio_input["input_features_mask"].squeeze(1)
+        input_features = self._collate_audio_batch(
+            audio_input["input_features_padded"], pad_value=0.0
+        )
+        input_features_mask = self._collate_audio_batch(
+            audio_input["input_features_mask"], pad_value=True
+        )
+
+        if input_features.dim() == 4 and input_features.shape[1] == 1:
+            input_features = input_features.squeeze(1)
+        if input_features_mask.dim() == 3 and input_features_mask.shape[1] == 1:
+            input_features_mask = input_features_mask.squeeze(1)
+        input_features_mask = input_features_mask.to(dtype=torch.bool)
         audio_outputs, audio_mask = self.audio_tower(
             input_features, ~input_features_mask
         )
@@ -641,6 +651,55 @@ class Gemma3nForConditionalGeneration(
         audio_features = torch.cat((audio_features, extra_padding_features), dim=1)
         # Return a list of embeddings instead of a batched tensor
         return audio_features.unbind(0)
+
+    @staticmethod
+    def _collate_audio_batch(
+        batch: Union[torch.Tensor, np.ndarray, Sequence[Any]],
+        *,
+        pad_value: Union[float, bool],
+    ) -> torch.Tensor:
+        if isinstance(batch, torch.Tensor):
+            return batch
+        if isinstance(batch, np.ndarray):
+            return torch.from_numpy(batch)
+
+        if isinstance(batch, Sequence):
+            if len(batch) == 0:
+                raise ValueError("Expected at least one tensor to collate")
+
+            tensors: list[torch.Tensor] = []
+            for item in batch:
+                if isinstance(item, torch.Tensor):
+                    tensor = item
+                else:
+                    tensor = torch.as_tensor(item)
+                tensors.append(tensor)
+
+            max_ndim = max(tensor.dim() for tensor in tensors)
+            normalized: list[torch.Tensor] = []
+            for tensor in tensors:
+                if tensor.dim() < max_ndim:
+                    for _ in range(max_ndim - tensor.dim()):
+                        tensor = tensor.unsqueeze(0)
+                normalized.append(tensor)
+
+            shapes = [tensor.shape for tensor in normalized]
+            max_shape = tuple(max(dim_sizes) for dim_sizes in zip(*shapes))
+
+            out = torch.full(
+                (len(normalized), *max_shape),
+                pad_value,
+                dtype=normalized[0].dtype,
+                device=normalized[0].device,
+            )
+
+            for idx, tensor in enumerate(normalized):
+                slices = (idx, *[slice(0, dim) for dim in tensor.shape])
+                out[slices] = tensor
+
+            return out
+
+        return torch.as_tensor(batch)
 
     def get_language_model(self) -> torch.nn.Module:
         return self.language_model
