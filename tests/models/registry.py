@@ -262,9 +262,6 @@ _TEXT_GENERATION_EXAMPLE_MODELS = {
     "FalconForCausalLM": _HfExamplesInfo("tiiuae/falcon-7b"),
     "FalconH1ForCausalLM": _HfExamplesInfo("tiiuae/Falcon-H1-0.5B-Base"),
     "FlexOlmoForCausalLM": _HfExamplesInfo("allenai/Flex-reddit-2x7B-1T"),
-    "FunAudioChatForConditionalGeneration": _HfExamplesInfo(
-        "funaudiochat", is_available_online=False
-    ),
     "GemmaForCausalLM": _HfExamplesInfo("google/gemma-1.1-2b-it"),
     "Gemma2ForCausalLM": _HfExamplesInfo(
         "google/gemma-2-9b", extras={"tiny": "google/gemma-2-2b-it"}
@@ -686,6 +683,9 @@ _MULTIMODAL_EXAMPLE_MODELS = {
     "Ernie4_5_VLMoeForConditionalGeneration": _HfExamplesInfo(
         "baidu/ERNIE-4.5-VL-28B-A3B-PT",
         trust_remote_code=True,
+    ),
+    "FunAudioChatForConditionalGeneration": _HfExamplesInfo(
+        "funaudiochat", is_available_online=False
     ),
     "FuyuForCausalLM": _HfExamplesInfo("adept/fuyu-8b"),
     "Gemma3ForConditionalGeneration": _HfExamplesInfo("google/gemma-3-4b-it"),

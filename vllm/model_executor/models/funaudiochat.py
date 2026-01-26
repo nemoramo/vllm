@@ -596,8 +596,18 @@ class FunAudioChatDummyInputsBuilder(
         feature_extractor = self.info.get_feature_extractor()
         sampling_rate = int(feature_extractor.sampling_rate)
 
-        # Use 1 second of audio per dummy item.
-        audio_len = sampling_rate
+        # Dummy inputs are used for profiling; construct the worst-case audio
+        # length that maximizes the number of encoder tokens.
+        cfg = self.info.get_hf_config()
+        audio_cfg = getattr(cfg, "audio_config", None)
+        max_audio_tokens = int(getattr(audio_cfg, "max_source_positions", 1500))
+        group_size = self.info.get_audio_group_size()
+        token_fps = int(getattr(self.info, "token_fps", 25))
+        target_num_frames = max(1, max_audio_tokens) * max(1, group_size)
+        audio_len = max(
+            1,
+            (target_num_frames * sampling_rate + token_fps - 1) // token_fps,
+        )
         num_audios = int(mm_counts.get("audio", 0))
 
         audio_overrides = mm_options.get("audio") if mm_options else None

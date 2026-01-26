@@ -10,15 +10,15 @@ Supports running via:
 Example (vLLM):
   python examples/offline_inference/funaudiochat.py \\
     --backend vllm \\
-    --model /data2/mayufeng/merged_models/funaudiochat_ckpt60000_merged \\
-    --audio /home/mayufeng/projects/sample.wav
+    --model /path/to/funaudiochat_model \\
+    --audio /path/to/sample.wav
 
 Example (transformers; requires LLaMA-Factory code available):
   conda run -n llamafactory python examples/offline_inference/funaudiochat.py \\
     --backend transformers \\
-    --llamafactory-src /home/mayufeng/projects/LLaMA-Factory/src \\
-    --model /data2/mayufeng/merged_models/funaudiochat_ckpt60000_merged \\
-    --audio /home/mayufeng/projects/sample.wav
+    --llamafactory-src /path/to/LLaMA-Factory/src \\
+    --model /path/to/funaudiochat_model \\
+    --audio /path/to/sample.wav
 """
 
 from __future__ import annotations
