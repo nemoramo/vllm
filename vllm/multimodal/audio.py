@@ -217,10 +217,3 @@ class AudioResampler:
                 "Supported methods are 'librosa' and 'scipy'."
             )
 
-
-# ---------------------------------------------------------------------------
-# Compatibility exports
-# ---------------------------------------------------------------------------
-# Some external plugins import AudioMediaIO from `vllm.multimodal.audio`.
-# The canonical implementation lives under `vllm.multimodal.media.audio`.
-from .media.audio import AudioEmbeddingMediaIO, AudioMediaIO  # noqa: E402,F401
