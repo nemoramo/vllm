@@ -48,6 +48,7 @@ from vllm.multimodal.processing import (
     PromptUpdateDetails,
 )
 from vllm.sequence import IntermediateTensors
+from vllm.utils.import_utils import _has_module
 
 from .interfaces import MultiModalEmbeddings, SupportsMultiModal, SupportsPP
 from .utils import AutoWeightsLoader, init_vllm_registered_model, maybe_prefix
@@ -294,14 +295,7 @@ class FunAudioChatAudioEncoder(nn.Module):
         # (~15000^2 elements after the CNN). Force FlashAttention-2 for such
         # inputs to avoid OOM and performance cliffs.
         if int(speech_maxlen) >= 7500:
-            try:
-                import importlib.util
-
-                has_flash_attn = importlib.util.find_spec("flash_attn") is not None
-            except Exception:
-                has_flash_attn = False
-
-            if not has_flash_attn:
+            if not _has_module("flash_attn"):
                 raise RuntimeError(
                     "FunAudioChat long audio (~300s) requires FlashAttention-2 "
                     "for the continuous audio tower, but `flash_attn` is not "
