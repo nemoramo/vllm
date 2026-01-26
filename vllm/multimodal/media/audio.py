@@ -32,6 +32,13 @@ _PCM32_SCALE = float(2**31)
 
 def _load_wav_bytes(data: bytes) -> tuple[npt.NDArray[np.floating], float]:
     with wave.open(BytesIO(data), "rb") as wf:
+        comptype = wf.getcomptype()
+        if comptype != "NONE":
+            raise ValueError(
+                f"Unsupported WAV compression type: {comptype}. "
+                "Only uncompressed PCM (comptype='NONE') is supported. "
+                "For compressed formats (ULAW, ALAW, etc.), use FLAC/OGG instead."
+            )
         sr = float(wf.getframerate())
         channels = int(wf.getnchannels())
         sampwidth = int(wf.getsampwidth())
