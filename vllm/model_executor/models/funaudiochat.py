@@ -782,15 +782,17 @@ class FunAudioChatForConditionalGeneration(nn.Module, SupportsMultiModal, Suppor
         self.multimodal_config = multimodal_config
         self.quant_config = quant_config
 
-        self.continuous_audio_tower = FunAudioChatAudioEncoder(config.audio_config)
-        self.audio_tower = FunAudioChatDiscreteEncoder(config.audio_config)
+        with self._mark_tower_model(vllm_config, "audio"):
+            self.continuous_audio_tower = FunAudioChatAudioEncoder(config.audio_config)
+            self.audio_tower = FunAudioChatDiscreteEncoder(config.audio_config)
 
-        self.language_model = init_vllm_registered_model(
-            vllm_config=vllm_config,
-            hf_config=config.text_config,
-            prefix=maybe_prefix(prefix, "language_model"),
-            architectures=["Qwen3ForCausalLM"],
-        )
+        with self._mark_language_model(vllm_config):
+            self.language_model = init_vllm_registered_model(
+                vllm_config=vllm_config,
+                hf_config=config.text_config,
+                prefix=maybe_prefix(prefix, "language_model"),
+                architectures=["Qwen3ForCausalLM"],
+            )
 
         self.make_empty_intermediate_tensors = (
             self.language_model.make_empty_intermediate_tensors
