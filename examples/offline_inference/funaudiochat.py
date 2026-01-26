@@ -58,10 +58,13 @@ def _build_prompt(
     use_chat_template: bool,
     *,
     include_audio: bool,
+    trust_remote_code: bool,
 ) -> str:
     from transformers import AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(model_dir, trust_remote_code=False)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_dir, trust_remote_code=trust_remote_code
+    )
     if include_audio:
         content = f"<|audio_bos|><|AUDIO|><|audio_eos|>\n{question}"
     else:
@@ -84,6 +87,7 @@ def _run_vllm(args: argparse.Namespace) -> None:
         args.question,
         args.use_chat_template,
         include_audio=not args.text_only,
+        trust_remote_code=args.trust_remote_code,
     )
 
     llm = LLM(
@@ -99,10 +103,9 @@ def _run_vllm(args: argparse.Namespace) -> None:
     req: dict[str, object] = {"prompt": prompt}
     if not args.text_only:
         audio, sr = _read_wav_mono(args.audio)
-        del sr
-        # Pass raw waveform without sampling rate to avoid requiring
-        # librosa/scipy resampling in vLLM runtime. Assumes wav is 16kHz.
-        req["multi_modal_data"] = {"audio": audio}
+        # Passing sampling rate enables vLLM to auto-resample audio when needed
+        # (and avoids silently assuming 16kHz).
+        req["multi_modal_data"] = {"audio": (audio, float(sr))}
 
     outputs = llm.generate(
         [req],
@@ -118,7 +121,9 @@ def _run_vllm(args: argparse.Namespace) -> None:
     if args.debug_mm:
         from transformers import AutoTokenizer
 
-        tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=False)
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model, trust_remote_code=args.trust_remote_code
+        )
         if req_out.prompt_token_ids is not None:
             print("=== vLLM prompt (decoded) ===")
             print(tokenizer.decode(req_out.prompt_token_ids, skip_special_tokens=False))
@@ -147,14 +152,19 @@ def _run_transformers(args: argparse.Namespace) -> None:
         args.question,
         args.use_chat_template,
         include_audio=not args.text_only,
+        trust_remote_code=args.trust_remote_code,
     )
 
-    processor = AutoProcessor.from_pretrained(args.model, trust_remote_code=False)
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=False)
+    processor = AutoProcessor.from_pretrained(
+        args.model, trust_remote_code=args.trust_remote_code
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model, trust_remote_code=args.trust_remote_code
+    )
     model = AutoModelForSeq2SeqLM.from_pretrained(
         args.model,
         torch_dtype=torch.bfloat16 if args.dtype == "bf16" else torch.float16,
-        trust_remote_code=False,
+        trust_remote_code=args.trust_remote_code,
     ).to(device)
     model.eval()
 
