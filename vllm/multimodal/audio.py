@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+import math
 from dataclasses import dataclass
 from enum import Enum
-import math
 from typing import Literal
 
 import numpy as np
@@ -216,3 +216,11 @@ class AudioResampler:
                 f"Invalid resampling method: {self.method}. "
                 "Supported methods are 'librosa' and 'scipy'."
             )
+
+
+# ---------------------------------------------------------------------------
+# Compatibility exports
+# ---------------------------------------------------------------------------
+# Some external plugins import AudioMediaIO from `vllm.multimodal.audio`.
+# The canonical implementation lives under `vllm.multimodal.media.audio`.
+from .media.audio import AudioEmbeddingMediaIO, AudioMediaIO  # noqa: E402,F401

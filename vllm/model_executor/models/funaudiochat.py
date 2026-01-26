@@ -850,8 +850,64 @@ class FunAudioChatForConditionalGeneration(nn.Module, SupportsMultiModal, Suppor
         if speech_ids is None:
             return []
 
-        assert isinstance(speech_ids, torch.Tensor)
-        assert isinstance(speech_attention_mask, torch.Tensor)
+        pad_id = int(getattr(self.audio_tower, "padding_idx", 0))
+
+        if not isinstance(speech_ids, torch.Tensor):
+            if (
+                isinstance(speech_ids, (list, tuple))
+                and len(speech_ids) > 0
+                and all(isinstance(t, torch.Tensor) for t in speech_ids)
+            ):
+                speech_ids_tensors = []
+                for t in speech_ids:
+                    if t.dim() == 2 and t.shape[0] == 1:
+                        t = t.squeeze(0)
+                    if t.dim() != 1:
+                        raise TypeError(
+                            "FunAudioChat speech_ids must be a 1D tensor per item "
+                            f"(got shape={tuple(t.shape)})"
+                        )
+                    speech_ids_tensors.append(t)
+                speech_ids = nn.utils.rnn.pad_sequence(
+                    speech_ids_tensors,
+                    batch_first=True,
+                    padding_value=pad_id,
+                )
+            else:
+                raise TypeError(
+                    "FunAudioChat speech_ids must be a Tensor or a sequence of Tensors "
+                    f"(got {type(speech_ids)})"
+                )
+
+        if speech_attention_mask is None:
+            speech_attention_mask = speech_ids.ne(pad_id).to(dtype=torch.int64)
+
+        if not isinstance(speech_attention_mask, torch.Tensor):
+            if (
+                isinstance(speech_attention_mask, (list, tuple))
+                and len(speech_attention_mask) > 0
+                and all(isinstance(t, torch.Tensor) for t in speech_attention_mask)
+            ):
+                mask_tensors = []
+                for t in speech_attention_mask:
+                    if t.dim() == 2 and t.shape[0] == 1:
+                        t = t.squeeze(0)
+                    if t.dim() != 1:
+                        raise TypeError(
+                            "FunAudioChat speech_attention_mask must be a 1D tensor "
+                            f"per item (got shape={tuple(t.shape)})"
+                        )
+                    mask_tensors.append(t)
+                speech_attention_mask = nn.utils.rnn.pad_sequence(
+                    mask_tensors,
+                    batch_first=True,
+                    padding_value=0,
+                )
+            else:
+                raise TypeError(
+                    "FunAudioChat speech_attention_mask must be a Tensor or a "
+                    f"sequence of Tensors (got {type(speech_attention_mask)})"
+                )
 
         debug = os.getenv("VLLM_FUN_AUDIOCHAT_DEBUG", "") == "1"
         if debug:
