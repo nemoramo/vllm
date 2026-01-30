@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import subprocess
 import time
 from pathlib import Path
 from urllib.parse import urljoin
@@ -46,6 +47,28 @@ def _guess_input_audio_format(path: Path) -> str:
     return ext
 
 
+def _get_duration_seconds_ffprobe(path: Path) -> float | None:
+    cmd = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(path),
+    ]
+    try:
+        out = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode("utf-8")
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+    out = out.strip()
+    try:
+        return float(out)
+    except ValueError:
+        return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Send one VibeVoice-ASR request to a running vLLM OpenAI server."
@@ -53,8 +76,23 @@ def main() -> int:
     parser.add_argument("--base-url", default="http://localhost:8006")
     parser.add_argument("--model", default="vibevoice")
     parser.add_argument("--audio", type=Path, required=True)
-    parser.add_argument("--prompt", default="Transcribe the audio.")
-    parser.add_argument("--max-tokens", type=int, default=256)
+    parser.add_argument(
+        "--prompt",
+        default=None,
+        help=(
+            "Text prompt appended after the audio. If omitted, uses the "
+            "official-style prompt that includes audio duration and asks "
+            "for JSON output."
+        ),
+    )
+    parser.add_argument(
+        "--system-prompt",
+        default=(
+            "You are a helpful assistant that transcribes audio input into "
+            "text output in JSON format."
+        ),
+    )
+    parser.add_argument("--max-tokens", type=int, default=32768)
     parser.add_argument(
         "--audio-part-type",
         choices=("audio_url", "input_audio"),
@@ -90,6 +128,19 @@ def main() -> int:
     except Exception as exc:  # pragma: no cover
         raise SystemExit("Missing dependency `requests`. Install it first.") from exc
 
+    if args.prompt is None:
+        duration = _get_duration_seconds_ffprobe(args.audio)
+        show_keys = ["Start time", "End time", "Speaker ID", "Content"]
+        if duration is None:
+            args.prompt = "Please transcribe the audio with these keys: " + ", ".join(
+                show_keys
+            )
+        else:
+            args.prompt = (
+                f"This is a {duration:.2f} seconds audio, please transcribe it "
+                f"with these keys: {', '.join(show_keys)}"
+            )
+
     if args.audio_part_type == "input_audio":
         audio_part = {
             "type": "input_audio",
@@ -107,7 +158,7 @@ def main() -> int:
     payload = {
         "model": args.model,
         "messages": [
-            {"role": "system", "content": "You are a helpful ASR assistant."},
+            {"role": "system", "content": args.system_prompt},
             {
                 "role": "user",
                 "content": [
@@ -118,6 +169,8 @@ def main() -> int:
         ],
         "max_tokens": args.max_tokens,
         "temperature": 0,
+        "top_p": 1.0,
+        "repetition_penalty": 1.0,
     }
     if args.stream:
         payload["stream"] = True
@@ -177,8 +230,10 @@ def main() -> int:
         except Exception:
             chunk = None
         if chunk:
-            printed += chunk
-            print(chunk, end="", flush=True)
+            to_print = chunk[len(printed) :] if chunk.startswith(printed) else chunk
+            if to_print:
+                printed += to_print
+                print(to_print, end="", flush=True)
 
     if printed:
         print("\n\n[transcript]\n" + printed)
