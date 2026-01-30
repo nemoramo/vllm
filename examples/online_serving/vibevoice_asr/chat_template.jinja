@@ -7,7 +7,7 @@
       {%- for part in message['content'] %}
         {%- if part['type'] == 'text' %}
 {{- part['text'] }}
-        {%- elif part['type'] == 'audio' or part['type'] == 'audio_url' %}
+        {%- elif part['type'] in ['audio', 'audio_url', 'input_audio'] %}
 {{- '<|AUDIO|>' }}
         {%- endif %}
       {%- endfor %}
@@ -21,7 +21,7 @@
       {%- for part in message['content'] %}
         {%- if part['type'] == 'text' %}
 {{- part['text'] }}
-        {%- elif part['type'] == 'audio' or part['type'] == 'audio_url' %}
+        {%- elif part['type'] in ['audio', 'audio_url', 'input_audio'] %}
 {{- '<|AUDIO|>' }}
         {%- endif %}
       {%- endfor %}
@@ -35,7 +35,7 @@
       {%- for part in message['content'] %}
         {%- if part['type'] == 'text' %}
 {{- part['text'] }}
-        {%- elif part['type'] == 'audio' or part['type'] == 'audio_url' %}
+        {%- elif part['type'] in ['audio', 'audio_url', 'input_audio'] %}
 {{- '<|AUDIO|>' }}
         {%- endif %}
       {%- endfor %}
@@ -46,4 +46,3 @@
 {%- if add_generation_prompt %}
 {{- '<|im_start|>assistant\n' }}
 {%- endif %}
-

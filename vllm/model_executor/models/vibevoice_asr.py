@@ -58,7 +58,7 @@ from vllm.multimodal.processing import (
 )
 from vllm.sequence import IntermediateTensors
 
-_AUDIO_PLACEHOLDER = "<|object_ref_start|><|box_start|><|object_ref_end|>"
+_AUDIO_PLACEHOLDER = "<|AUDIO|>"
 _SPEECH_START_TOKEN = "<|object_ref_start|>"
 _SPEECH_END_TOKEN = "<|object_ref_end|>"
 _SPEECH_PAD_TOKEN = "<|box_start|>"
@@ -262,12 +262,16 @@ class VibeVoiceASRMultiModalProcessor(
             )
 
         compress_ratio = int(self.info.speech_tok_compress_ratio)
+        newline_ids = tokenizer.encode("\n", add_special_tokens=False)
+        newline_id = newline_ids[0] if len(newline_ids) == 1 else None
 
         def replacement(item_idx: int) -> PromptUpdateDetails[list[int]]:
             audio_len = int(audios.get_audio_length(item_idx))
             num_tokens = int(math.ceil(audio_len / compress_ratio))
             num_tokens = max(1, num_tokens)
             token_ids = [int(start_id)] + [int(pad_id)] * num_tokens + [int(end_id)]
+            if newline_id is not None:
+                token_ids.append(int(newline_id))
             return PromptUpdateDetails.select_token_id(
                 token_ids, embed_token_id=int(pad_id)
             )
