@@ -39,6 +39,13 @@ def _to_data_url(path: Path) -> str:
     return f"data:{mime};base64,{b64}"
 
 
+def _guess_input_audio_format(path: Path) -> str:
+    ext = path.suffix.lower().lstrip(".")
+    if not ext:
+        return "wav"
+    return ext
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Send one VibeVoice-ASR request to a running vLLM OpenAI server."
@@ -48,6 +55,15 @@ def main() -> int:
     parser.add_argument("--audio", type=Path, required=True)
     parser.add_argument("--prompt", default="Transcribe the audio.")
     parser.add_argument("--max-tokens", type=int, default=256)
+    parser.add_argument(
+        "--audio-part-type",
+        choices=("audio_url", "input_audio"),
+        default="audio_url",
+        help=(
+            "OpenAI content part type for audio. "
+            "`audio_url` sends a URL/data: URL; `input_audio` sends base64 data."
+        ),
+    )
     parser.add_argument(
         "--use-data-url",
         action="store_true",
@@ -74,9 +90,20 @@ def main() -> int:
     except Exception as exc:  # pragma: no cover
         raise SystemExit("Missing dependency `requests`. Install it first.") from exc
 
-    audio_url = (
-        _to_data_url(args.audio) if args.use_data_url else _to_file_url(args.audio)
-    )
+    if args.audio_part_type == "input_audio":
+        audio_part = {
+            "type": "input_audio",
+            "input_audio": {
+                "data": base64.b64encode(args.audio.read_bytes()).decode("utf-8"),
+                "format": _guess_input_audio_format(args.audio),
+            },
+        }
+    else:
+        audio_url = (
+            _to_data_url(args.audio) if args.use_data_url else _to_file_url(args.audio)
+        )
+        audio_part = {"type": "audio_url", "audio_url": {"url": audio_url}}
+
     payload = {
         "model": args.model,
         "messages": [
@@ -84,7 +111,7 @@ def main() -> int:
             {
                 "role": "user",
                 "content": [
-                    {"type": "audio_url", "audio_url": {"url": audio_url}},
+                    audio_part,
                     {"type": "text", "text": args.prompt},
                 ],
             },
